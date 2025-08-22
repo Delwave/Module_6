@@ -1,0 +1,107 @@
+import os
+import time
+import shutil
+import threading
+import tkinter as tk
+from tkinter import filedialog, scrolledtext
+
+PREFIX = "GR_8_"      # префикс файлов
+CHECK_INTERVAL = 2    # задержка между проверками (секунды)
+
+
+def is_file_ready(filepath):
+    """Проверяем, можно ли прочитать файл (значит он догрузился)."""
+    try:
+        with open(filepath, "rb"):
+            return True
+    except (PermissionError, OSError):
+        return False
+
+
+class FileMoverApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("File Mover")
+        self.root.geometry("400x300")
+        self.root.resizable(False, False)
+
+        self.source_dir = ""
+        self.target_dir = ""
+        self.running = False
+
+        # Интерфейс
+        tk.Label(root, text="Папка-источник:").pack(anchor="w", padx=10, pady=2)
+        self.src_label = tk.Label(root, text="не выбрана", fg="gray")
+        self.src_label.pack(anchor="w", padx=20)
+        tk.Button(root, text="Выбрать", command=self.choose_source).pack(pady=5)
+
+        tk.Label(root, text="Папка-назначение:").pack(anchor="w", padx=10, pady=2)
+        self.dst_label = tk.Label(root, text="не выбрана", fg="gray")
+        self.dst_label.pack(anchor="w", padx=20)
+        tk.Button(root, text="Выбрать", command=self.choose_target).pack(pady=5)
+
+        self.status_label = tk.Label(root, text="⏹ Остановлено", fg="red")
+        self.status_label.pack(pady=5)
+
+        tk.Button(root, text="▶ Запустить", command=self.start).pack(side="left", padx=30, pady=10)
+        tk.Button(root, text="⏹ Остановить", command=self.stop).pack(side="right", padx=30, pady=10)
+
+        self.log_area = scrolledtext.ScrolledText(root, width=45, height=8, state="disabled")
+        self.log_area.pack(padx=10, pady=5)
+
+    def log(self, message):
+        self.log_area.config(state="normal")
+        self.log_area.insert(tk.END, message + "\n")
+        self.log_area.see(tk.END)
+        self.log_area.config(state="disabled")
+
+    def choose_source(self):
+        self.source_dir = filedialog.askdirectory(title="Выбор папки-источника")
+        if self.source_dir:
+            self.src_label.config(text=self.source_dir, fg="black")
+
+    def choose_target(self):
+        self.target_dir = filedialog.askdirectory(title="Выбор папки-назначения")
+        if self.target_dir:
+            self.dst_label.config(text=self.target_dir, fg="black")
+
+    def start(self):
+        if not self.source_dir or not self.target_dir:
+            self.log("❌ Нужно выбрать обе папки!")
+            return
+        if not self.running:
+            self.running = True
+            self.status_label.config(text="✔ Работает", fg="green")
+            threading.Thread(target=self.worker, daemon=True).start()
+
+    def stop(self):
+        self.running = False
+        self.status_label.config(text="⏹ Остановлено", fg="red")
+
+    def worker(self):
+        self.log("🚀 Наблюдение запущено...")
+        while self.running:
+            try:
+                for filename in os.listdir(self.source_dir):
+                    if filename.startswith(PREFIX):
+                        source_path = os.path.join(self.source_dir, filename)
+                        target_path = os.path.join(self.target_dir, filename)
+
+                        if is_file_ready(source_path):
+                            try:
+                                shutil.move(source_path, target_path)
+                                self.log(f"✅ Файл {filename} перемещён")
+                            except Exception as e:
+                                self.log(f"❌ Ошибка при перемещении {filename}: {e}")
+                        else:
+                            self.log(f"⏳ Файл {filename} загружается...")
+                time.sleep(CHECK_INTERVAL)
+            except Exception as e:
+                self.log(f"⚠ Ошибка: {e}")
+                time.sleep(5)
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = FileMoverApp(root)
+    root.mainloop()
