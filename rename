@@ -1,45 +1,75 @@
 import os
-from datetime import datetime
-from tkinter import Tk, filedialog, simpledialog, messagebox
+import tkinter as tk
+from tkinter import filedialog, messagebox, scrolledtext
 
-# Открываем графическое окно для выбора папки
-root = Tk()
-root.withdraw()  # Скрываем основное окно
+class FileRenamerApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Переименователь файлов")
+        self.root.geometry("700x500")  # большой размер окна
 
-folder_path = filedialog.askdirectory(title="Выберите папку с файлами")
+        # Кнопка выбора файлов
+        self.select_button = tk.Button(root, text="Выбрать файлы", command=self.select_files)
+        self.select_button.pack(pady=10)
 
-if not folder_path:
-    messagebox.showinfo("Отмена", "Папка не выбрана")
-    exit()
+        # Список выбранных файлов
+        self.file_listbox = tk.Listbox(root, width=100, height=10)
+        self.file_listbox.pack(pady=5)
 
-# Получаем список файлов
-files = os.listdir(folder_path)
-files = [f for f in files if os.path.isfile(os.path.join(folder_path, f))]
+        # Поля для поиска и замены
+        frame = tk.Frame(root)
+        frame.pack(pady=10)
 
-# Выбираем файлы вручную
-selected_files = []
-for f in files:
-    answer = messagebox.askyesno("Выбор файла", f"Обработать файл?\n{f}")
-    if answer:
-        selected_files.append(f)
+        tk.Label(frame, text="Что заменить:").grid(row=0, column=0, padx=5)
+        self.search_entry = tk.Entry(frame, width=30)
+        self.search_entry.grid(row=0, column=1, padx=5)
 
-if not selected_files:
-    messagebox.showinfo("Отмена", "Файлы не выбраны")
-    exit()
+        tk.Label(frame, text="На что заменить:").grid(row=0, column=2, padx=5)
+        self.replace_entry = tk.Entry(frame, width=30)
+        self.replace_entry.grid(row=0, column=3, padx=5)
 
-# Запрашиваем часть названия, которую нужно заменить
-old_text = simpledialog.askstring("Замена текста", "Какую часть названия нужно заменить?")
-if not old_text:
-    messagebox.showinfo("Отмена", "Текст для замены не введен")
-    exit()
+        # Кнопка переименования
+        self.rename_button = tk.Button(root, text="Переименовать", command=self.rename_files)
+        self.rename_button.pack(pady=10)
 
-# Формируем новую дату
-new_text = datetime.now().strftime("%Y-%m-%d")  # Формат YYYY-MM-DD
+        # Лог
+        tk.Label(root, text="Лог:").pack()
+        self.log_text = scrolledtext.ScrolledText(root, width=85, height=10)
+        self.log_text.pack(pady=5)
 
-# Переименовываем файлы
-for f in selected_files:
-    if old_text in f:
-        new_name = f.replace(old_text, new_text)
-        os.rename(os.path.join(folder_path, f), os.path.join(folder_path, new_name))
+        self.files = []
 
-messagebox.showinfo("Готово", "Файлы успешно переименованы!")
+    def select_files(self):
+        self.files = filedialog.askopenfilenames(title="Выберите файлы")
+        self.file_listbox.delete(0, tk.END)
+        for f in self.files:
+            self.file_listbox.insert(tk.END, f)
+
+    def rename_files(self):
+        search_text = self.search_entry.get()
+        replace_text = self.replace_entry.get()
+
+        if not self.files:
+            messagebox.showwarning("Внимание", "Сначала выберите файлы!")
+            return
+
+        if not search_text:
+            messagebox.showwarning("Внимание", "Укажите, что заменяем!")
+            return
+
+        for filepath in self.files:
+            dirname, filename = os.path.split(filepath)
+            new_filename = filename.replace(search_text, replace_text)
+            new_path = os.path.join(dirname, new_filename)
+            try:
+                os.rename(filepath, new_path)
+                self.log_text.insert(tk.END, f"Переименовано: {filename} → {new_filename}\n")
+            except Exception as e:
+                self.log_text.insert(tk.END, f"Ошибка с {filename}: {e}\n")
+
+        messagebox.showinfo("Готово", "Переименование завершено!")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = FileRenamerApp(root)
+    root.mainloop()
