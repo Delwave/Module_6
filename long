@@ -3,10 +3,12 @@ import time
 import shutil
 import threading
 import tkinter as tk
-from tkinter import filedialog, scrolledtext
+from tkinter import filedialog, scrolledtext, ttk
 
-PREFIX = "GR_8_"      # префикс файлов
 CHECK_INTERVAL = 2    # задержка между проверками (секунды)
+
+# доступные префиксы
+PREFIXES = ["GR_1_", "GR_3_", "GR_4_", "GR_5_", "GR_6_", "GR_7_", "GR_8_", "GR_9_", "GR_13_"]
 
 
 def is_file_ready(filepath):
@@ -22,14 +24,15 @@ class FileMoverApp:
     def __init__(self, root):
         self.root = root
         self.root.title("File Mover")
-        self.root.geometry("400x300")
+        self.root.geometry("600x400")  # увеличил окно
         self.root.resizable(False, False)
 
         self.source_dir = ""
         self.target_dir = ""
         self.running = False
+        self.prefix = tk.StringVar(value=PREFIXES[-2])  # по умолчанию GR_8_
 
-        # Интерфейс
+        # === Интерфейс ===
         tk.Label(root, text="Папка-источник:").pack(anchor="w", padx=10, pady=2)
         self.src_label = tk.Label(root, text="не выбрана", fg="gray")
         self.src_label.pack(anchor="w", padx=20)
@@ -40,14 +43,24 @@ class FileMoverApp:
         self.dst_label.pack(anchor="w", padx=20)
         tk.Button(root, text="Выбрать", command=self.choose_target).pack(pady=5)
 
+        # выпадающий список для выбора префикса
+        tk.Label(root, text="Выберите префикс файла:").pack(anchor="w", padx=10, pady=2)
+        self.prefix_menu = ttk.Combobox(root, textvariable=self.prefix, values=PREFIXES, state="readonly")
+        self.prefix_menu.pack(pady=5)
+
+        # статус
         self.status_label = tk.Label(root, text="⏹ Остановлено", fg="red")
         self.status_label.pack(pady=5)
 
-        tk.Button(root, text="▶ Запустить", command=self.start).pack(side="left", padx=30, pady=10)
-        tk.Button(root, text="⏹ Остановить", command=self.stop).pack(side="right", padx=30, pady=10)
+        # кнопки управления
+        control_frame = tk.Frame(root)
+        control_frame.pack(pady=5)
+        tk.Button(control_frame, text="▶ Запустить", command=self.start, width=15).pack(side="left", padx=10)
+        tk.Button(control_frame, text="⏹ Остановить", command=self.stop, width=15).pack(side="right", padx=10)
 
-        self.log_area = scrolledtext.ScrolledText(root, width=45, height=8, state="disabled")
-        self.log_area.pack(padx=10, pady=5)
+        # окно логов (сделал больше)
+        self.log_area = scrolledtext.ScrolledText(root, width=70, height=15, state="disabled")
+        self.log_area.pack(padx=10, pady=10)
 
     def log(self, message):
         self.log_area.config(state="normal")
@@ -71,7 +84,7 @@ class FileMoverApp:
             return
         if not self.running:
             self.running = True
-            self.status_label.config(text="✔ Работает", fg="green")
+            self.status_label.config(text=f"✔ Работает (префикс: {self.prefix.get()})", fg="green")
             threading.Thread(target=self.worker, daemon=True).start()
 
     def stop(self):
@@ -79,11 +92,11 @@ class FileMoverApp:
         self.status_label.config(text="⏹ Остановлено", fg="red")
 
     def worker(self):
-        self.log("🚀 Наблюдение запущено...")
+        self.log(f"🚀 Наблюдение запущено (префикс: {self.prefix.get()})...")
         while self.running:
             try:
                 for filename in os.listdir(self.source_dir):
-                    if filename.startswith(PREFIX):
+                    if filename.startswith(self.prefix.get()):
                         source_path = os.path.join(self.source_dir, filename)
                         target_path = os.path.join(self.target_dir, filename)
 
